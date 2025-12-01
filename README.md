@@ -1,3 +1,11 @@
 # DemonFM
 
-A simple TUI file manager
+A Simple TUI FileManager
+
+# Keybinds
+
+- Navigation -> vim keybinds / arrow keys
+- Show/Hide dotfiles -> I
+- Rename a file / directory -> R
+- Delete a file / directory -> D
+- Add a file / Directory -> A
