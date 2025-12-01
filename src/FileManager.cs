@@ -7,6 +7,7 @@ using System.Linq;
 using demonfm.UI;
 using demonfm.Preview;
 using demonfm.ConfigManager;
+using demonfm.fzf;
 
 namespace demonfm.filemanager
 {
@@ -166,6 +167,9 @@ namespace demonfm.filemanager
                     break;
                 case ConsoleKey.P:
                     PasteItem();
+                    break;
+                case ConsoleKey.Z:
+                    HandleFzf();
                     break;
                 case ConsoleKey.Q:
                 case ConsoleKey.Escape:
@@ -506,6 +510,79 @@ namespace demonfm.filemanager
                  _clipboardPaths.Clear();
             }
             RefreshItems();
+        }
+
+                private void HandleFzf()
+                {
+                    if (currentPath == null) return;
+                    
+                    if (!demonfm.fzf.FzfSelector.CheckFzfInstalled())
+                    {
+                        ui.DisplayError("fzf is not installed");
+                        return;
+                    }
+        
+                    Console.SetCursorPosition(0, 0);
+                    string homeDirectory = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+                    string? result = demonfm.fzf.FzfSelector.RunFzf(homeDirectory);
+                    RestoreState();
+        
+                    if (string.IsNullOrEmpty(result)) return;
+        
+                    string fullPath = Path.GetFullPath(Path.Combine(homeDirectory, result));
+        
+                    if (Directory.Exists(fullPath))
+                    {
+                        currentPath = fullPath;
+                        selectedIndex = 0;
+                        scrollOffset = 0;
+                        _selectedFiles.Clear();
+                        RefreshItems();
+                    }
+                    else if (File.Exists(fullPath))
+                    {
+                        OpenFile(new FileInfo(fullPath));
+                    }
+                }
+        private void OpenFile(FileInfo file)
+        {
+            if (!IsBinary(file))
+            {
+                string editor = Environment.GetEnvironmentVariable("EDITOR") ?? "nano";
+                try
+                {
+                    Console.Clear();
+                    var psi = new ProcessStartInfo
+                    {
+                        FileName = editor,
+                        Arguments = $"\"{file.FullName}\"",
+                        UseShellExecute = false
+                    };
+                    var process = Process.Start(psi);
+                    process?.WaitForExit();
+                    RestoreState();
+                }
+                catch (Exception ex)
+                {
+                    RestoreState();
+                    ui.DisplayError($"Could not open editor: {ex.Message}");
+                }
+            }
+            else
+            {
+                try
+                {
+                    Process.Start(new ProcessStartInfo
+                    {
+                        FileName = file.FullName,
+                        UseShellExecute = true
+                    });
+                }
+                catch (Exception ex)
+                {
+                    ui.DisplayError($"Could not open file: {ex.Message}");
+                }
+            }
         }
 
         private void CopyDirectory(string sourceDir, string destinationDir, bool recursive = true)

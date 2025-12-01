@@ -13,5 +13,6 @@ A Simple TUI FileManager
 - Add a file / directory -> a
 - Yank a file / directory -> y
 - Paste a file / directory -> p
-- cut a file / directory -> x
-- select multiple files / directories -> space
+- Cut a file / directory -> x
+- Select multiple files / directories -> space
+- Search using fzf (make ssure fzf is installed) -> z
