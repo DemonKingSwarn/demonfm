@@ -7,7 +7,7 @@ A Simple TUI FileManager
 # Keybinds
 
 - Navigation -> vim keybinds / arrow keys
-- Show/Hide dotfiles -> I
-- Rename a file / directory -> R
-- Delete a file / directory -> D
-- Add a file / Directory -> A
+- Show/Hide dotfiles -> i
+- Rename a file / directory -> r
+- Delete a file / directory -> d
+- Add a file / Directory -> a
