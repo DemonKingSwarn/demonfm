@@ -214,7 +214,7 @@ namespace demonfm.UI
                 status = "0/0";
             }
 
-            string controls = "[r]ename [d]elete [a]dd [q]uit";
+            string controls = "[r]ename [d]elete [a]dd [y]ank [x]cut [p]aste [space]multi-select [q]uit";
             
             Console.Write(" " + status);
             
