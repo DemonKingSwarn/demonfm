@@ -29,7 +29,7 @@ namespace demonfm.UI
             return Height - HeaderHeight - FooterHeight;
         }
 
-        public void Draw(string? currentPath, List<FileSystemInfo>? items, int selectedIndex, int scrollOffset, List<string> previewLines, string? previewImagePath)
+        public void Draw(string? currentPath, List<FileSystemInfo>? items, int selectedIndex, int scrollOffset, List<string> previewLines, string? previewImagePath, HashSet<string> selectedFiles)
         {
             UpdateDimensions();
             ClearPreviewImage();
@@ -41,7 +41,7 @@ namespace demonfm.UI
             int midX = Width / 2;
 
             DrawHeader(currentPath, midX);
-            DrawList(items, selectedIndex, scrollOffset, midX);
+            DrawList(items, selectedIndex, scrollOffset, midX, selectedFiles);
             DrawPreview(previewLines, midX, previewImagePath);
             DrawFooter(items, selectedIndex, midX);
         }
@@ -64,7 +64,7 @@ namespace demonfm.UI
             Console.Write("│");
             Console.ForegroundColor = ConsoleColor.DarkGray;
             
-            string header = string.Format(" {0,-12} {1,-10} {2,-20} {3}", "Mode", "Size", "Date", "Name");
+            string header = string.Format(" {0,-20} {1}", "Date", "Name");
             PrintContent(header, midX - 1);
             
             Console.ResetColor();
@@ -78,7 +78,7 @@ namespace demonfm.UI
             Console.Write("├" + leftBorder + "┼" + rightBorder + "┤");
         }
 
-        private void DrawList(List<FileSystemInfo>? items, int selectedIndex, int scrollOffset, int midX)
+        private void DrawList(List<FileSystemInfo>? items, int selectedIndex, int scrollOffset, int midX, HashSet<string> selectedFiles)
         {
             int listHeight = GetListHeight();
             int contentWidth = midX - 1;
@@ -94,26 +94,39 @@ namespace demonfm.UI
                 {
                     var item = items[itemIndex];
                     bool isSelected = itemIndex == selectedIndex;
+                    bool isMultiSelected = selectedFiles.Contains(item.FullName);
 
                     if (isSelected)
                     {
                         Console.BackgroundColor = ConsoleColor.DarkGray;
-                        Console.ForegroundColor = ConsoleColor.White;
+                        if (isMultiSelected) Console.ForegroundColor = ConsoleColor.Yellow;
+                        else Console.ForegroundColor = ConsoleColor.White;
                     }
                     else
                     {
                         Console.ResetColor();
-                        if (item is DirectoryInfo) Console.ForegroundColor = ConsoleColor.Blue;
-                        else if (item.Extension == ".exe" || item.Extension == ".sh") Console.ForegroundColor = ConsoleColor.Green;
-                        else Console.ForegroundColor = ConsoleColor.Gray;
+                        if (isMultiSelected) 
+                        {
+                            Console.ForegroundColor = ConsoleColor.Yellow;
+                        }
+                        else if (item is DirectoryInfo) 
+                        {
+                            Console.ForegroundColor = ConsoleColor.Blue;
+                        }
+                        else if (item.Extension == ".exe" || item.Extension == ".sh") 
+                        {
+                            Console.ForegroundColor = ConsoleColor.Green;
+                        }
+                        else 
+                        {
+                            Console.ForegroundColor = ConsoleColor.Gray;
+                        }
                     }
 
-                    string mode = item is DirectoryInfo ? "drwxr-xr-x" : "-rw-r--r--"; 
-                    string size = item is FileInfo f ? FormatBytes(f.Length) : "4.0 K"; 
                     string date = item.LastWriteTime.ToString("MMM dd HH:mm");
                     string name = item.Name;
 
-                    string line = string.Format(" {0,-12} {1,-10} {2,-20} {3}", mode, size, date, name);
+                    string line = string.Format(" {0,-20} {1}", date, name);
                     
                     PrintContent(line, contentWidth);
                 }
@@ -193,7 +206,8 @@ namespace demonfm.UI
             if (items != null && selectedIndex >= 0 && selectedIndex < items.Count)
             {
                 var item = items[selectedIndex];
-                status = $"{selectedIndex + 1}/{items.Count} : {item.Name}";
+                string sizeInfo = item is FileInfo f ? $" {FormatBytes(f.Length)}" : "";
+                status = $"{selectedIndex + 1}/{items.Count} : {item.Name}{sizeInfo}";
             }
             else
             {

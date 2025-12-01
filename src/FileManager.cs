@@ -18,6 +18,10 @@ namespace demonfm.filemanager
         public static int scrollOffset;
         public static bool running = true;
 
+        private List<string> _clipboardPaths = new List<string>();
+        private bool _clipboardIsCut;
+        private HashSet<string> _selectedFiles = new HashSet<string>();
+
         private Ui ui;
         private bool isKittyTerminal;
         private Config config;
@@ -34,6 +38,7 @@ namespace demonfm.filemanager
             currentPath = Directory.GetCurrentDirectory();
             selectedIndex = 0;
             scrollOffset = 0;
+            _selectedFiles.Clear();
             
             string? term = Environment.GetEnvironmentVariable("TERM");
             string? termProgram = Environment.GetEnvironmentVariable("TERM_PROGRAM");
@@ -96,7 +101,7 @@ namespace demonfm.filemanager
                  preview = PreviewGenerator.GetPreview(selected, maxLines, isKittyTerminal, config.ShowHiddenFiles);
             }
 
-            ui.Draw(currentPath, items, selectedIndex, scrollOffset, preview.Lines, preview.ImagePath);
+            ui.Draw(currentPath, items, selectedIndex, scrollOffset, preview.Lines, preview.ImagePath, _selectedFiles);
         }
 
         public void HandleInput()
@@ -124,6 +129,9 @@ namespace demonfm.filemanager
                             scrollOffset++;
                     }
                     break;
+                case ConsoleKey.Spacebar:
+                    ToggleSelection();
+                    break;
                 case ConsoleKey.Enter:
                 case ConsoleKey.RightArrow:
                 case ConsoleKey.L:
@@ -136,7 +144,7 @@ namespace demonfm.filemanager
                 case ConsoleKey.H:
                     NavigateUp();
                     break;
-                case ConsoleKey.I:
+                case ConsoleKey.OemPeriod: // '.'
                     config.ShowHiddenFiles = !config.ShowHiddenFiles;
                     config.Save();
                     RefreshItems();
@@ -149,6 +157,15 @@ namespace demonfm.filemanager
                     break;
                 case ConsoleKey.A:
                     CreateItem();
+                    break;
+                case ConsoleKey.Y:
+                    YankItem();
+                    break;
+                case ConsoleKey.X:
+                    CutItem();
+                    break;
+                case ConsoleKey.P:
+                    PasteItem();
                     break;
                 case ConsoleKey.Q:
                 case ConsoleKey.Escape:
@@ -216,30 +233,42 @@ namespace demonfm.filemanager
         public void DeleteItem()
         {
             if (items == null || items.Count == 0) return;
-            var selected = items[selectedIndex];
+            
+            List<string> pathsToDelete = new List<string>();
+            if (_selectedFiles.Count > 0)
+            {
+                pathsToDelete.AddRange(_selectedFiles);
+            }
+            else
+            {
+                pathsToDelete.Add(items[selectedIndex].FullName);
+            }
 
-            bool confirm = ui.GetConfirmation($"Delete '{selected.Name}'?");
+            bool confirm = ui.GetConfirmation($"Delete {pathsToDelete.Count} item(s)?");
             if (!confirm) return;
 
-            try
+            foreach (var path in pathsToDelete)
             {
-                if (selected is DirectoryInfo dir)
+                try
                 {
-                    dir.Delete(true);
+                    if (Directory.Exists(path))
+                    {
+                        Directory.Delete(path, true);
+                    }
+                    else if (File.Exists(path))
+                    {
+                        File.Delete(path);
+                    }
                 }
-                else
+                catch (Exception ex)
                 {
-                    selected.Delete();
+                    ui.DisplayError($"Delete failed for '{Path.GetFileName(path)}': {ex.Message}");
                 }
-                
-                if (selectedIndex >= items.Count - 1 && selectedIndex > 0) selectedIndex--;
-                
-                RefreshItems();
             }
-            catch (Exception ex)
-            {
-                ui.DisplayError($"Delete failed: {ex.Message}");
-            }
+            
+            _selectedFiles.Clear();
+            if (selectedIndex >= items.Count - 1 && selectedIndex > 0) selectedIndex--;
+            RefreshItems();
         }
 
         public void CreateItem()
@@ -288,6 +317,7 @@ namespace demonfm.filemanager
                     currentPath = selected.FullName;
                     selectedIndex = 0;
                     scrollOffset = 0;
+                    _selectedFiles.Clear();
                     RefreshItems();
                 }
                 catch (UnauthorizedAccessException)
@@ -299,7 +329,6 @@ namespace demonfm.filemanager
             {
                 if (!IsBinary(file))
                 {
-                    // Open in EDITOR
                     string editor = Environment.GetEnvironmentVariable("EDITOR") ?? "nano";
                     try
                     {
@@ -312,13 +341,11 @@ namespace demonfm.filemanager
                         };
                         var process = Process.Start(psi);
                         process?.WaitForExit();
-                        
-                        // Restore TUI
-                        Initialize();
+                        RestoreState();
                     }
                     catch (Exception ex)
                     {
-                        Initialize(); // Ensure we restore even if error
+                        RestoreState();
                         ui.DisplayError($"Could not open editor: {ex.Message}");
                     }
                 }
@@ -340,6 +367,14 @@ namespace demonfm.filemanager
             }
         }
 
+        private void RestoreState()
+        {
+            Console.CursorVisible = false;
+            Console.Title = "DemonFM";
+            Console.Clear();
+            RefreshItems();
+        }
+
         private bool IsBinary(FileInfo file)
         {
             string[] binaryExtensions = { ".exe", ".dll", ".bin", ".iso", ".zip", ".tar", ".gz", ".7z", ".png", ".jpg", ".jpeg", ".gif", ".bmp", ".pdf" };
@@ -355,6 +390,7 @@ namespace demonfm.filemanager
                 currentPath = parent.FullName;
                 selectedIndex = 0;
                 scrollOffset = 0;
+                _selectedFiles.Clear();
                 RefreshItems();
             }
         }
@@ -362,6 +398,138 @@ namespace demonfm.filemanager
         public void DisplayError(string message)
         {
             ui.DisplayError(message);
+        }
+
+        private void ToggleSelection()
+        {
+            if (items != null && selectedIndex < items.Count)
+            {
+                var selected = items[selectedIndex].FullName;
+                if (_selectedFiles.Contains(selected))
+                    _selectedFiles.Remove(selected);
+                else
+                    _selectedFiles.Add(selected);
+
+                if (selectedIndex < items.Count - 1)
+                {
+                    selectedIndex++;
+                    int listHeight = ui.GetListHeight();
+                    if (selectedIndex >= scrollOffset + listHeight)
+                        scrollOffset++;
+                }
+            }
+        }
+
+        private void YankItem()
+        {
+            if (items == null) return;
+
+            _clipboardPaths.Clear();
+            
+            if (_selectedFiles.Count > 0)
+            {
+                _clipboardPaths.AddRange(_selectedFiles);
+                _selectedFiles.Clear();
+            }
+            else if (selectedIndex < items.Count)
+            {
+                _clipboardPaths.Add(items[selectedIndex].FullName);
+            }
+            
+            _clipboardIsCut = false;
+        }
+
+        private void CutItem()
+        {
+            if (items == null) return;
+
+            _clipboardPaths.Clear();
+
+            if (_selectedFiles.Count > 0)
+            {
+                _clipboardPaths.AddRange(_selectedFiles);
+                _selectedFiles.Clear();
+            }
+            else if (selectedIndex < items.Count)
+            {
+                _clipboardPaths.Add(items[selectedIndex].FullName);
+            }
+
+            _clipboardIsCut = true;
+        }
+
+        private void PasteItem()
+        {
+            if (_clipboardPaths.Count == 0 || currentPath == null) return;
+
+            foreach (var sourcePath in _clipboardPaths.ToList())
+            {
+                bool isDir = Directory.Exists(sourcePath);
+                bool isFile = File.Exists(sourcePath);
+
+                if (!isDir && !isFile) 
+                {
+                    ui.DisplayError($"Source '{Path.GetFileName(sourcePath)}' not found.");
+                    continue;
+                }
+
+                string name = Path.GetFileName(sourcePath);
+                string destPath = Path.Combine(currentPath, name);
+
+                if (File.Exists(destPath) || Directory.Exists(destPath))
+                {
+                    ui.DisplayError($"Destination '{name}' already exists.");
+                    continue;
+                }
+
+                try
+                {
+                    if (_clipboardIsCut)
+                    {
+                        if (isDir) Directory.Move(sourcePath, destPath);
+                        else File.Move(sourcePath, destPath);
+                    }
+                    else
+                    {
+                        if (isDir) CopyDirectory(sourcePath, destPath);
+                        else File.Copy(sourcePath, destPath);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    ui.DisplayError($"Paste failed for '{name}': {ex.Message}");
+                }
+            }
+
+            if (_clipboardIsCut)
+            {
+                 _clipboardPaths.Clear();
+            }
+            RefreshItems();
+        }
+
+        private void CopyDirectory(string sourceDir, string destinationDir, bool recursive = true)
+        {
+            var dir = new DirectoryInfo(sourceDir);
+            if (!dir.Exists) throw new DirectoryNotFoundException($"Source directory not found: {dir.FullName}");
+
+            DirectoryInfo[] dirs = dir.GetDirectories();
+            Directory.CreateDirectory(destinationDir);
+
+            foreach (FileInfo file in dir.GetFiles())
+            {
+                string targetFilePath = Path.Combine(destinationDir, file.Name);
+                file.CopyTo(targetFilePath);
+            }
+
+            if (recursive)
+            {
+                foreach (DirectoryInfo subDir in dirs)
+                {
+                    string newDestinationDir = Path.Combine(destinationDir, subDir.Name);
+                    CopyDirectory(subDir.FullName, newDestinationDir, true);
+                }
+            }
         }
     }
 }
