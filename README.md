@@ -2,6 +2,8 @@
 
 A Simple TUI FileManager
 
+![](./.assets/showcase.png)
+
 # Keybinds
 
 - Navigation -> vim keybinds / arrow keys
