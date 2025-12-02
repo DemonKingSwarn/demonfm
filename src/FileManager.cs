@@ -100,9 +100,12 @@ namespace demonfm.filemanager
             
             if (items != null && items.Count > 0 && selectedIndex < items.Count)
             {
+                 ui.UpdateDimensions();
                  var selected = items[selectedIndex];
                  int maxLines = ui.GetListHeight();
-                 preview = PreviewGenerator.GetPreview(selected, maxLines, isKittyTerminal, config.ShowHiddenFiles);
+                 int midX = ui.Width / 2;
+                 int maxWidth = ui.Width - midX - 2;
+                 preview = PreviewGenerator.GetPreview(selected, maxLines, maxWidth, config.ShowHiddenFiles, config.ChafaBackend);
             }
 
             ui.Draw(currentPath, items, selectedIndex, scrollOffset, preview.Lines, preview.ImagePath, _selectedFiles);

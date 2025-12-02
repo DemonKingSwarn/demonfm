@@ -1,1 +1,4 @@
 show_hidden_files = true
+
+[chafa]
+backend = "sixel"

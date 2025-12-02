@@ -11,7 +11,7 @@ namespace demonfm.Preview
     {
         private static bool? hasBat;
 
-        public static (List<string> Lines, string? ImagePath) GetPreview(FileSystemInfo selected, int maxLines, bool isKittyTerminal, bool showHiddenFiles)
+        public static (List<string> Lines, string? ImagePath) GetPreview(FileSystemInfo selected, int maxLines, int maxWidth, bool showHiddenFiles, string chafaBackend)
         {
             var previewLines = new List<string>();
 
@@ -49,7 +49,6 @@ namespace demonfm.Preview
                 {
                     string ext = file.Extension.ToLower();
 
-                    // Image handling
                     string[] imageExtensions = { 
                         ".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp", ".avif", ".jxl", 
                         ".ico", ".tiff", ".tif", ".svg", ".heic", ".heif", ".pbm", ".pgm", 
@@ -57,15 +56,18 @@ namespace demonfm.Preview
                     };
                     if (imageExtensions.Contains(ext))
                     {
-                        if (isKittyTerminal)
+                        if (!string.IsNullOrEmpty(chafaBackend))
                         {
-                            return (previewLines, file.FullName);
+                             var chafaOut = TryRunCommand("chafa", $"\"{file.FullName}\" -f {chafaBackend} -s {maxWidth}x{maxLines}");
+                             if (chafaOut != null)
+                             {
+                                 // Return as raw data string (second element), empty lines list
+                                 return (new List<string>(), string.Join("\n", chafaOut));
+                             }
                         }
-                        else
-                        {
-                             previewLines.Add("Image file (No preview)");
-                             return (previewLines, null);
-                        }
+                        
+                        previewLines.Add("Image file (No preview)");
+                        return (previewLines, null);
                     }
 
                     if (IsMediaFile(ext))

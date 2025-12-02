@@ -143,18 +143,19 @@ namespace demonfm.UI
             }
         }
 
-        private void DrawPreview(List<string> previewLines, int midX, string? previewImagePath)
+        private void DrawPreview(List<string> previewLines, int midX, string? previewRawData)
         {
             int listHeight = GetListHeight();
             int startX = midX + 1;
             int contentWidth = Width - startX - 1;
 
+            // Draw borders and clear area (or print text preview if no raw data)
             for (int i = 0; i < listHeight; i++)
             {
                 int y = HeaderHeight + i;
                 Console.SetCursorPosition(startX, y);
                 
-                if (previewImagePath == null && i < previewLines.Count)
+                if (previewRawData == null && i < previewLines.Count)
                 {
                     string line = previewLines[i];
                     PrintContent(line, contentWidth);
@@ -168,9 +169,28 @@ namespace demonfm.UI
                 Console.Write("│");
             }
 
-            if (previewImagePath != null)
+            if (previewRawData != null)
             {
-                DrawImagePreview(previewImagePath, startX, HeaderHeight, contentWidth, listHeight);
+                // Check for Graphics (Sixel starts with ESC P, Kitty with ESC _ G)
+                bool isGraphics = previewRawData.StartsWith("\x1bP") || previewRawData.StartsWith("\x1b_G");
+
+                if (isGraphics)
+                {
+                    Console.SetCursorPosition(startX, HeaderHeight);
+                    Console.Write(previewRawData);
+                }
+                else
+                {
+                    // Text-based chafa output (symbols)
+                    // Print line by line to maintain cursor X position
+                    var lines = previewRawData.Split('\n');
+                    for (int i = 0; i < listHeight && i < lines.Length; i++)
+                    {
+                        Console.SetCursorPosition(startX, HeaderHeight + i);
+                        // Don't truncate ansi here, trust chafa -s
+                        Console.Write(lines[i]);
+                    }
+                }
             }
         }
 

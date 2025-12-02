@@ -6,6 +6,7 @@ namespace demonfm.ConfigManager
     public class Config
     {
         public bool ShowHiddenFiles { get; set; } = false;
+        public string ChafaBackend { get; set; } = "";
 
         private static string ConfigDir => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "demonfm");
         private static string ConfigPath => Path.Combine(ConfigDir, "config.toml");
@@ -18,24 +19,47 @@ namespace demonfm.ConfigManager
             try
             {
                 var lines = File.ReadAllLines(ConfigPath);
+                bool inChafaSection = false;
+
                 foreach (var line in lines)
                 {
                     var trimmed = line.Trim();
-                    if (trimmed.StartsWith("show_hidden_files"))
+                    if (string.IsNullOrEmpty(trimmed)) continue;
+
+                    if (trimmed.StartsWith("[") && trimmed.EndsWith("]"))
                     {
-                        var parts = trimmed.Split('=');
-                        if (parts.Length == 2)
+                        inChafaSection = trimmed == "[chafa]";
+                        continue;
+                    }
+
+                    if (inChafaSection)
+                    {
+                        if (trimmed.StartsWith("backend"))
                         {
-                            string valStr = parts[1].Trim().ToLower();
-                            if (valStr == "true") config.ShowHiddenFiles = true;
-                            else if (valStr == "false") config.ShowHiddenFiles = false;
+                            var parts = trimmed.Split('=');
+                            if (parts.Length == 2)
+                            {
+                                config.ChafaBackend = parts[1].Trim().Trim('"');
+                            }
+                        }
+                    }
+                    else
+                    {
+                        if (trimmed.StartsWith("show_hidden_files"))
+                        {
+                            var parts = trimmed.Split('=');
+                            if (parts.Length == 2)
+                            {
+                                string valStr = parts[1].Trim().ToLower();
+                                if (valStr == "true") config.ShowHiddenFiles = true;
+                                else if (valStr == "false") config.ShowHiddenFiles = false;
+                            }
                         }
                     }
                 }
             }
             catch 
             { 
-                // Fallback to defaults on error
             }
             return config;
         }
@@ -45,11 +69,17 @@ namespace demonfm.ConfigManager
             try
             {
                 if (!Directory.Exists(ConfigDir)) Directory.CreateDirectory(ConfigDir);
-                File.WriteAllText(ConfigPath, $"show_hidden_files = {ShowHiddenFiles.ToString().ToLower()}");
+                
+                var sb = new System.Text.StringBuilder();
+                sb.AppendLine($"show_hidden_files = {ShowHiddenFiles.ToString().ToLower()}");
+                sb.AppendLine();
+                sb.AppendLine("[chafa]");
+                sb.AppendLine($"backend = \"{ChafaBackend}\"");
+                
+                File.WriteAllText(ConfigPath, sb.ToString());
             }
             catch 
             {
-                // Ignore save errors for now or handle UI error if possible, 
             }
         }
     }
