@@ -16,3 +16,5 @@ A Simple TUI FileManager
 - Cut a file / directory -> x
 - Select multiple files / directories -> space
 - Search using fzf (make ssure fzf is installed) -> z
+- Extract archives (zip/7z/rar/tar) -> e
+- Compress (zip/7z/tar) -> c

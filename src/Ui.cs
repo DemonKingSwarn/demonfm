@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text.RegularExpressions;
+using demonfm.Lua;
 
 namespace demonfm.UI
 {
@@ -49,7 +50,7 @@ namespace demonfm.UI
         private void DrawHeader(string? currentPath, int midX)
         {
             Console.SetCursorPosition(0, 0);
-            Console.ForegroundColor = ConsoleColor.Magenta;
+            SetColor(Luaize.GetColor("HeaderPath"), true);
             Console.Write(" " + (currentPath ?? "/"));
             Console.ResetColor();
             ClearLineRemainder();
@@ -62,7 +63,7 @@ namespace demonfm.UI
 
             Console.SetCursorPosition(0, 2);
             Console.Write("│");
-            Console.ForegroundColor = ConsoleColor.DarkGray;
+            SetColor(Luaize.GetColor("HeaderTitle"), true);
             
             string header = string.Format(" {0,-20} {1}", "Date", "Name");
             PrintContent(header, midX - 1);
@@ -98,28 +99,28 @@ namespace demonfm.UI
 
                     if (isSelected)
                     {
-                        Console.BackgroundColor = ConsoleColor.DarkGray;
-                        if (isMultiSelected) Console.ForegroundColor = ConsoleColor.Yellow;
-                        else Console.ForegroundColor = ConsoleColor.White;
+                        SetColor(Luaize.GetColor("ListSelectedBg"), false);
+                        if (isMultiSelected) SetColor(Luaize.GetColor("ListMultiSelectedFg"), true);
+                        else SetColor(Luaize.GetColor("ListSelectedFg"), true);
                     }
                     else
                     {
                         Console.ResetColor();
                         if (isMultiSelected) 
                         {
-                            Console.ForegroundColor = ConsoleColor.Yellow;
+                            SetColor(Luaize.GetColor("ListMultiSelectedFg"), true);
                         }
                         else if (item is DirectoryInfo) 
                         {
-                            Console.ForegroundColor = ConsoleColor.Blue;
+                            SetColor(Luaize.GetColor("ListDirectory"), true);
                         }
                         else if (item.Extension == ".exe" || item.Extension == ".sh") 
                         {
-                            Console.ForegroundColor = ConsoleColor.Green;
+                            SetColor(Luaize.GetColor("ListExecutable"), true);
                         }
                         else 
                         {
-                            Console.ForegroundColor = ConsoleColor.Gray;
+                            SetColor(Luaize.GetColor("ListDefault"), true);
                         }
                     }
 
@@ -214,7 +215,7 @@ namespace demonfm.UI
                 status = "0/0";
             }
 
-            string controls = "[r]ename [d]elete [a]dd [y]ank [x]cut [p]aste [space]multi-select [q]uit";
+            string controls = "[r]ename [d]elete [a]dd [y]ank [x]cut [p]aste [e]xtract [c]ompress [space]sel [q]uit";
             
             Console.Write(" " + status);
             
@@ -222,7 +223,7 @@ namespace demonfm.UI
             int pad = Width - currentPos - controls.Length - 3; 
             if (pad > 0) Console.Write(new string(' ', pad));
             
-            Console.ForegroundColor = ConsoleColor.DarkGray;
+            SetColor(Luaize.GetColor("Footer"), true);
             Console.Write(" " + controls + " ");
             Console.ResetColor();
         }
@@ -248,7 +249,7 @@ namespace demonfm.UI
             ClearLineRemainder();
             Console.SetCursorPosition(0, Height - 1);
             
-            Console.ForegroundColor = ConsoleColor.Yellow;
+            SetColor(Luaize.GetColor("Confirmation"), true);
             Console.Write($"{message} (y/N) ");
             Console.ResetColor();
 
@@ -323,8 +324,8 @@ namespace demonfm.UI
         public void DisplayError(string message)
         {
             Console.SetCursorPosition(0, Height - 1);
-            Console.BackgroundColor = ConsoleColor.Red;
-            Console.ForegroundColor = ConsoleColor.White;
+            SetColor(Luaize.GetColor("ErrorBg"), false);
+            SetColor(Luaize.GetColor("ErrorFg"), true);
             Console.Write($" error: {message} ".PadRight(Width));
             Console.ReadKey(true);
             Console.ResetColor();
@@ -342,5 +343,20 @@ namespace demonfm.UI
             }
             return string.Format("{0:n1}{1}", number, suffixes[counter]);
         }
-    }
+
+        private void SetColor(DemonColor color, bool isForeground)
+        {
+            if (color.IsRgb)
+            {
+                string seq = isForeground 
+                    ? $"\x1b[38;2;{color.R};{color.G};{color.B}m"
+                    : $"\x1b[48;2;{color.R};{color.G};{color.B}m";
+                Console.Write(seq);
+            }
+            else
+            {
+                if (isForeground) Console.ForegroundColor = color.Standard;
+                else Console.BackgroundColor = color.Standard;
+            }
+        }    }
 }

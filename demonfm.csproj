@@ -9,4 +9,8 @@
     <IsAotCompatible>true</IsAotCompatible>
   </PropertyGroup>
 
+  <ItemGroup>
+    <PackageReference Include="NLua" Version="1.7.6" />
+  </ItemGroup>
+
 </Project>

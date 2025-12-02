@@ -8,6 +8,8 @@ using demonfm.UI;
 using demonfm.Preview;
 using demonfm.ConfigManager;
 using demonfm.fzf;
+using demonfm.zipper;
+using demonfm.Lua;
 
 namespace demonfm.filemanager
 {
@@ -20,8 +22,8 @@ namespace demonfm.filemanager
         public static bool running = true;
 
         private List<string> _clipboardPaths = new List<string>();
-        private bool _clipboardIsCut;
         private HashSet<string> _selectedFiles = new HashSet<string>();
+        private bool _clipboardIsCut;
 
         private Ui ui;
         private bool isKittyTerminal;
@@ -35,6 +37,7 @@ namespace demonfm.filemanager
 
         public void Initialize()
         {
+            Luaize.LoadTheme();
             config = Config.Load();
             currentPath = Directory.GetCurrentDirectory();
             selectedIndex = 0;
@@ -167,6 +170,12 @@ namespace demonfm.filemanager
                     break;
                 case ConsoleKey.P:
                     PasteItem();
+                    break;
+                case ConsoleKey.E:
+                    HandleExtract();
+                    break;
+                case ConsoleKey.C:
+                    HandleCompress();
                     break;
                 case ConsoleKey.Z:
                     HandleFzf();
@@ -510,6 +519,72 @@ namespace demonfm.filemanager
                  _clipboardPaths.Clear();
             }
             RefreshItems();
+        }
+
+        private void HandleExtract()
+        {
+            if (items == null || selectedIndex >= items.Count) return;
+            
+            var selected = items[selectedIndex];
+            if (selected is DirectoryInfo) return; // Can't extract a directory
+
+            // Prompt for destination name/folder
+            // Default to a folder named after the file (without extension)
+            string nameWithoutExt = Path.GetFileNameWithoutExtension(selected.Name);
+            if (nameWithoutExt.EndsWith(".tar")) nameWithoutExt = Path.GetFileNameWithoutExtension(nameWithoutExt); // Handle .tar.gz -> .tar -> name
+
+            string? input = ui.ReadInput($"Extract to (default: {nameWithoutExt}/): ");
+            string folderName = string.IsNullOrWhiteSpace(input) ? nameWithoutExt : input;
+            
+            string destinationDir = Path.Combine(currentPath!, folderName);
+
+            try
+            {
+                Console.Clear();
+                Zipper.Extract(selected.FullName, destinationDir);
+                RestoreState();
+                RefreshItems();
+            }
+            catch (Exception ex)
+            {
+                RestoreState();
+                ui.DisplayError($"Extraction failed: {ex.Message}");
+            }
+        }
+
+        private void HandleCompress()
+        {
+            if (currentPath == null) return;
+            
+            List<string> sources = new List<string>();
+            if (_selectedFiles.Count > 0)
+            {
+                sources.AddRange(_selectedFiles);
+            }
+            else if (items != null && selectedIndex < items.Count)
+            {
+                sources.Add(items[selectedIndex].FullName);
+            }
+
+            if (sources.Count == 0) return;
+
+            string? archiveName = ui.ReadInput("Archive name (e.g. data.zip, backup.tar.gz): ");
+            if (string.IsNullOrWhiteSpace(archiveName)) return;
+
+            string destinationPath = Path.Combine(currentPath, archiveName);
+
+            try
+            {
+                Console.Clear();
+                Zipper.Compress(sources, destinationPath);
+                RestoreState();
+                RefreshItems();
+            }
+            catch (Exception ex)
+            {
+                RestoreState();
+                ui.DisplayError($"Compression failed: {ex.Message}");
+            }
         }
 
                 private void HandleFzf()
