@@ -18,3 +18,5 @@ A Simple TUI FileManager
 - Search using fzf (make ssure fzf is installed) -> z
 - Extract archives (zip/7z/rar/tar) -> e
 - Compress (zip/7z/tar) -> c
+
+It also supports image previews using `chafa`
